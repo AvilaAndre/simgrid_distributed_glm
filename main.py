@@ -1,36 +1,13 @@
-from simgrid import Actor, Engine, Host, Mailbox, this_actor
+from simgrid import Engine, Host, this_actor
 import numpy as np
 import sys
 import os
 import csv
 import torch
-from torch.types import Tensor
-from dataclasses import dataclass
 
 from simulation.LM import LM
-from simulation.messages import CoefficientsMsg
-
-
-@dataclass
-class ModelCoefficients:
-    coefficients: Tensor
-
-
-def watcher(name: str, n: int, central_lm: ModelCoefficients):
-    mailbox = Mailbox.by_name(name)
-
-    this_actor.info(f"{name} started")
-
-    coefficient_msgs = []
-    for i in range(n):
-        msg = mailbox.get()
-
-        if type(msg) is CoefficientsMsg:
-            coefficient_msgs.append(msg)
-
-    check(central_lm, coefficient_msgs)
-
-    Actor.kill_all()
+from simulation.dataclasses import ModelCoefficients
+from simulation.aggregator import aggregator
 
 
 def model_data(m):
@@ -68,14 +45,6 @@ def model_beta(m):
     return result
 
 
-def check(central: ModelCoefficients, coefficients_msgs: list[CoefficientsMsg]):
-    res = all(
-        np.allclose(msg.coefficients, central.coefficients) for msg in coefficients_msgs
-    )
-
-    this_actor.info(f"Are the coefficients from every peer equal to central's? {res}")
-
-
 def start_run(n, data, module):
     y_len = len(data["y"])
     ncols = len(data["x"][0])
@@ -97,7 +66,7 @@ def start_run(n, data, module):
         )
 
     e.add_actor(
-        aggregator_name, Host.by_name("Observer"), watcher, aggregator_name, n, beta
+        aggregator_name, Host.by_name("Observer"), aggregator, aggregator_name, n, beta
     )
 
 
@@ -136,6 +105,5 @@ if __name__ == "__main__":
 
         if m == "lm":
             start_run(n, data, LM)
-
 
     e.run()

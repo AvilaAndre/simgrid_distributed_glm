@@ -1,44 +1,11 @@
-from simgrid import ActivitySet, Engine, Mailbox, this_actor
-from dataclasses import dataclass
-import sys
+from simgrid import Engine, Mailbox, this_actor
 import torch
-from torch.types import Tensor
 
 from linear_model import LinearModel
-from .messages import CoefficientsMsg
-
-
-# TODO: Remove this
-@dataclass
-class FlowUpdatingMsg:
-    sender: str
-    flow: float
-    estimate: float
-
-    def size(self) -> int:
-        return (
-            sys.getsizeof(self)
-            + sys.getsizeof(self.sender)
-            + sys.getsizeof(self.flow)
-            + sys.getsizeof(self.estimate)
-        )
-
-
-@dataclass
-class LMConcatMessage:
-    origin: str
-    r_remote: Tensor
-
-
-@dataclass
-class LMState:
-    model: LinearModel
-    r_remotes: dict[str, Tensor]
-    nodes: list[str]
+from .dataclasses import LMState, LMConcatMessage, ModelCoefficients
 
 
 class LM:
-    TICK_INTERVAL: float = 100.0
     _next_id = 0
 
     def next_name() -> str:
@@ -49,18 +16,14 @@ class LM:
     def __init__(
         self, name: str, aggregator_name: str, x: torch.Tensor, y: torch.Tensor
     ):
-        self.name: str = name
-
         this_actor.on_exit(
             lambda killed: this_actor.info(
                 "Exiting now (killed)." if killed else "Exiting now (finishing)."
             )
         )
 
-        model: LinearModel = LinearModel.fit(x, y)
-
-        self.state: LMState = LMState(model, {}, [])
-
+        self.name: str = name
+        self.state = LMState(LinearModel.fit(x, y), {}, [])
         # setup mailbox
         self.mailbox = Mailbox.by_name(self.name)
         self.aggregator_mb = Mailbox.by_name(aggregator_name)
@@ -70,20 +33,13 @@ class LM:
     def run(self):
         this_actor.info(f"LinearModel {self.name} started.")
 
-        self.start()
+        self.broadcast_concat_r()
 
-        msgs_to_rcv = len(self.state.nodes)
-
-        while msgs_to_rcv > 0:
+        # Keeps waiting for message until killed
+        while True:
             self.receive_concat_r_msg(self.mailbox.get())
-            msgs_to_rcv -= 1
 
-        # Sending coefficients to aggregator
-        self.aggregator_mb.put(
-            CoefficientsMsg(self.state.model.coefficients), 0
-        )  # TODO: Add message size
-
-    def start(self):
+    def broadcast_concat_r(self):
         nodes_filtered = []
 
         for actor_name in [actor.name for actor in Engine.instance.all_actors]:
@@ -111,6 +67,12 @@ class LM:
                     torch.cat(list(self.state.r_remotes.values()), dim=0),
                 )
 
-                # TODO: Signal that simulation is done
-                # {:ok, parent} = Registry.meta(Registry.Simulation, :parent)
-                # send(parent, :simulation_is_done)
+                self.send_coefficients_and_exit()
+
+    def send_coefficients_and_exit(self):
+        self.aggregator_mb.put(
+            ModelCoefficients(self.state.model.coefficients), 0
+        )  # TODO: Add message size
+
+        # kill actor
+        this_actor.exit()
