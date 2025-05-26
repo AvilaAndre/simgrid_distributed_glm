@@ -6,6 +6,7 @@ import csv
 import torch
 
 from simulation.LM import LM
+from simulation.GLM import GLM
 from simulation.dataclasses import ModelCoefficients
 from simulation.aggregator import aggregator
 
@@ -55,16 +56,24 @@ def start_run(n, data, module):
     data_x = torch.tensor(data["x"], dtype=torch.float64)
     data_y = torch.tensor(data["y"], dtype=torch.float64)
 
-    aggregator_name = "LMAggregator"
+    aggregator_name = f"{module.__name__}Aggregator"
 
     for x, y in zip(chunk_nx(data_x, n), chunk_nx(data_y, n)):
         # INFO: this is where simulation nodes are started
-        actor_name = LM.next_name()
+        actor_name = module.next_name()
 
         Engine.instance.add_actor(
-            actor_name, Host.by_name("Observer"), LM, actor_name, aggregator_name, x, y
+            actor_name,
+            Host.by_name("Observer"),
+            module,
+            actor_name,
+            aggregator_name,
+            x,
+            y,
         )
 
+    # TODO: Add actors names which should be
+    # sending message to know when to stop.
     e.add_actor(
         aggregator_name, Host.by_name("Observer"), aggregator, aggregator_name, n, beta
     )
@@ -92,18 +101,17 @@ def chunk_nx(mat, n):
 if __name__ == "__main__":
     e = Engine(sys.argv)
     e.load_platform("./obs_platform.xml")
-    # e.load_deployment("./actors.xml")
 
     n = 7
 
-    for m in ["lm"]:  # FIXME: add "glm"
+    for m in ["lm", "glm"]:
         data = model_data(m)
 
         beta = ModelCoefficients(torch.tensor(model_beta(m), dtype=torch.float64))
 
-        # experiment_result = experiment(m).(n, data, beta)
-
         if m == "lm":
             start_run(n, data, LM)
+        elif m == "glm":
+            start_run(n, data, GLM)
 
     e.run()

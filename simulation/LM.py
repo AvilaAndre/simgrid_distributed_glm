@@ -31,7 +31,7 @@ class LM:
         self.run()
 
     def run(self):
-        this_actor.info(f"LinearModel {self.name} started.")
+        this_actor.info(f"Actor {self.name} started.")
 
         self.broadcast_concat_r()
 

@@ -1,8 +1,16 @@
 from dataclasses import dataclass
 from torch.types import Tensor
 from linear_model import LinearModel
+from generalized_linear_model import GeneralizedLinearModel
 
 import sys
+
+
+@dataclass
+class LMState:
+    model: LinearModel
+    r_remotes: dict[str, Tensor]
+    nodes: list[str]
 
 
 @dataclass
@@ -18,14 +26,29 @@ class LMConcatMessage:
     def size(self) -> int:
         return (
             sys.getsizeof(self)
-            + sys.getsizeof(self.sender)
-            + sys.getsizeof(self.flow)
-            + sys.getsizeof(self.estimate)
+            + sys.getsizeof(self.origin)
+            + sys.getsizeof(self.r_remote)
         )
 
 
 @dataclass
-class LMState:
-    model: LinearModel
-    r_remotes: dict[str, Tensor]
+class GLMState:
+    model: GeneralizedLinearModel
+    data: tuple[Tensor, Tensor]
+    r_remotes: dict[str, int]
+    total_nrow: int
     nodes: list[str]
+    finished: bool
+
+
+@dataclass
+class GLMSumRowsMessage:
+    origin: str
+    nrows: int
+
+
+@dataclass
+class GLMConcatMessage:
+    origin: str
+    r_remote: Tensor
+    iter: int
