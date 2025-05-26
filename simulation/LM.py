@@ -46,7 +46,9 @@ class LM:
         LM._next_id += 1
         return name
 
-    def __init__(self, name: str, x: torch.Tensor, y: torch.Tensor):
+    def __init__(
+        self, name: str, aggregator_name: str, x: torch.Tensor, y: torch.Tensor
+    ):
         self.name: str = name
 
         this_actor.on_exit(
@@ -61,7 +63,7 @@ class LM:
 
         # setup mailbox
         self.mailbox = Mailbox.by_name(self.name)
-        self.pending_comms = ActivitySet()
+        self.aggregator_mb = Mailbox.by_name(aggregator_name)
 
         self.run()
 
@@ -77,7 +79,7 @@ class LM:
             msgs_to_rcv -= 1
 
         # Sending coefficients to aggregator
-        Mailbox.by_name("LMAggregator").put(
+        self.aggregator_mb.put(
             CoefficientsMsg(self.state.model.coefficients), 0
         )  # TODO: Add message size
 

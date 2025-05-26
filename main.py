@@ -19,13 +19,11 @@ class ModelCoefficients:
 def watcher(name: str, n: int, central_lm: ModelCoefficients):
     mailbox = Mailbox.by_name(name)
 
-    this_actor.info(f"{name}")
-    this_actor.info(f"{central_lm}")
+    this_actor.info(f"{name} started")
 
     coefficient_msgs = []
     for i in range(n):
         msg = mailbox.get()
-        # print(f"{name} received {msg}")
 
         if type(msg) is CoefficientsMsg:
             coefficient_msgs.append(msg)
@@ -71,7 +69,6 @@ def model_beta(m):
 
 
 def check(central: ModelCoefficients, coefficients_msgs: list[CoefficientsMsg]):
-    # TODO: This
     res = all(
         np.allclose(msg.coefficients, central.coefficients) for msg in coefficients_msgs
     )
@@ -89,13 +86,19 @@ def start_run(n, data, module):
     data_x = torch.tensor(data["x"], dtype=torch.float64)
     data_y = torch.tensor(data["y"], dtype=torch.float64)
 
+    aggregator_name = "LMAggregator"
+
     for x, y in zip(chunk_nx(data_x, n), chunk_nx(data_y, n)):
         # INFO: this is where simulation nodes are started
         actor_name = LM.next_name()
 
         Engine.instance.add_actor(
-            actor_name, Host.by_name("Observer"), LM, actor_name, x, y
+            actor_name, Host.by_name("Observer"), LM, actor_name, aggregator_name, x, y
         )
+
+    e.add_actor(
+        aggregator_name, Host.by_name("Observer"), watcher, aggregator_name, n, beta
+    )
 
 
 def chunk_nx(mat, n):
@@ -134,8 +137,5 @@ if __name__ == "__main__":
         if m == "lm":
             start_run(n, data, LM)
 
-        e.add_actor(
-            "watcher", Host.by_name("Observer"), watcher, "LMAggregator", n, beta
-        )
 
     e.run()
