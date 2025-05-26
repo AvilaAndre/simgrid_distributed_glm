@@ -5,8 +5,10 @@ import torch
 from torch.types import Tensor
 
 from linear_model import LinearModel
+from .messages import CoefficientsMsg
 
 
+# TODO: Remove this
 @dataclass
 class FlowUpdatingMsg:
     sender: str
@@ -47,7 +49,11 @@ class LM:
     def __init__(self, name: str, x: torch.Tensor, y: torch.Tensor):
         self.name: str = name
 
-        this_actor.on_exit(lambda killed: this_actor.info("Exiting now (killed)." if killed else "Exiting now (finishing)."))
+        this_actor.on_exit(
+            lambda killed: this_actor.info(
+                "Exiting now (killed)." if killed else "Exiting now (finishing)."
+            )
+        )
 
         model: LinearModel = LinearModel.fit(x, y)
 
@@ -70,9 +76,10 @@ class LM:
             self.receive_concat_r_msg(self.mailbox.get())
             msgs_to_rcv -= 1
 
-
-
-        this_actor.info("Should send r_local to watcher")
+        # Sending coefficients to aggregator
+        Mailbox.by_name("LMAggregator").put(
+            CoefficientsMsg(self.state.model.coefficients), 0
+        )  # TODO: Add message size
 
     def start(self):
         nodes_filtered = []
@@ -86,7 +93,7 @@ class LM:
 
     def send_concat_r(self, target):
         msg = LMConcatMessage(self.name, self.state.model.r_local)
-        Mailbox.by_name(target).put_async(msg, 0) # TODO: Add message size
+        Mailbox.by_name(target).put_async(msg, 0)  # TODO: Add message size
 
     def receive_concat_r_msg(self, msg: LMConcatMessage):
         sender, r_remote = msg.origin, msg.r_remote

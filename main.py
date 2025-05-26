@@ -1,31 +1,37 @@
-from simgrid import Actor, Engine, Host, NetZone, this_actor
-from collections import defaultdict
+from simgrid import Actor, Engine, Host, Mailbox, this_actor
 import numpy as np
-import torch
 import sys
 import os
 import csv
+import torch
+from torch.types import Tensor
+from dataclasses import dataclass
 
 from simulation.LM import LM
-from linear_model import LinearModel
-
-global_values = defaultdict(dict)
+from simulation.messages import CoefficientsMsg
 
 
-def print_global_values():
-    for key in global_values.keys():
-        this_actor.info(f"{key}{global_values[key]}")
+@dataclass
+class ModelCoefficients:
+    coefficients: Tensor
 
 
-def watcher(run_until: float, time_interval: float = 10.0):
-    while Engine.clock < run_until:
-        this_actor.sleep_for(min(time_interval, run_until - Engine.clock))
-        print_global_values()
+def watcher(name: str, n: int, central_lm: ModelCoefficients):
+    mailbox = Mailbox.by_name(name)
 
-    this_actor.info(f"{list(Engine.instance.all_actors)}")
-    this_actor.info(f"{list(Engine.instance.all_hosts)}")
-    this_actor.info("Killing every actor but myself.")
-    this_actor.info(f"{list(Engine.instance.all_actors)}")
+    this_actor.info(f"{name}")
+    this_actor.info(f"{central_lm}")
+
+    coefficient_msgs = []
+    for i in range(n):
+        msg = mailbox.get()
+        # print(f"{name} received {msg}")
+
+        if type(msg) is CoefficientsMsg:
+            coefficient_msgs.append(msg)
+
+    check(central_lm, coefficient_msgs)
+
     Actor.kill_all()
 
 
@@ -64,27 +70,13 @@ def model_beta(m):
     return result
 
 
-def linear_model(n, data, central_lm):
-    nodes = start_run(n, data, LM)
-    central_lm = LinearModel.fit(
-        torch.tensor(data["x"], dtype=torch.float64),
-        torch.tensor(data["y"], dtype=torch.float64),
-    )
-    # check(central_lm, nodes)
-
-
-def check(central, nodes):
+def check(central: ModelCoefficients, coefficients_msgs: list[CoefficientsMsg]):
+    # TODO: This
     res = all(
-        np.allclose(node.model.coefficients, central.coefficients) for node in nodes
+        np.allclose(msg.coefficients, central.coefficients) for msg in coefficients_msgs
     )
 
-    print(
-        "check",
-        [np.allclose(node.model.coefficients, central.coefficients) for node in nodes],
-        res,
-    )
-
-    return res, central.coefficients
+    this_actor.info(f"Are the coefficients from every peer equal to central's? {res}")
 
 
 def start_run(n, data, module):
@@ -97,7 +89,6 @@ def start_run(n, data, module):
     data_x = torch.tensor(data["x"], dtype=torch.float64)
     data_y = torch.tensor(data["y"], dtype=torch.float64)
 
-    actors = []
     for x, y in zip(chunk_nx(data_x, n), chunk_nx(data_y, n)):
         # INFO: this is where simulation nodes are started
         actor_name = LM.next_name()
@@ -105,9 +96,6 @@ def start_run(n, data, module):
         Engine.instance.add_actor(
             actor_name, Host.by_name("Observer"), LM, actor_name, x, y
         )
-        actors.append(actor_name)
-
-    return actors
 
 
 def chunk_nx(mat, n):
@@ -134,36 +122,20 @@ if __name__ == "__main__":
     e.load_platform("./obs_platform.xml")
     # e.load_deployment("./actors.xml")
 
-
-    e.add_actor("watcher", Host.by_name("Observer"), watcher, 1000.0, 10.0)
-
     n = 7
 
     for m in ["lm"]:  # FIXME: add "glm"
         data = model_data(m)
-        beta = {"coefficients": torch.tensor(model_beta(m), dtype=torch.float64)}
+
+        beta = ModelCoefficients(torch.tensor(model_beta(m), dtype=torch.float64))
 
         # experiment_result = experiment(m).(n, data, beta)
 
         if m == "lm":
-            linear_model(n, data, beta)
+            start_run(n, data, LM)
+
+        e.add_actor(
+            "watcher", Host.by_name("Observer"), watcher, "LMAggregator", n, beta
+        )
 
     e.run()
-    """
-
-
-    e.register_actor("peer", Peer)
-    e.load_deployment("./actors.xml")
-
-    e.netzone_root.add_host("observer", 25e6)
-
-    # Add a watcher of the changes
-    Actor.create("watcher", Host.by_name("observer"), watcher, 1000.0, 10.0)
-
-    random.seed(200)
-
-    e.run_until(10000)
-
-    this_actor.info("Simulation finished")
-
-    """
