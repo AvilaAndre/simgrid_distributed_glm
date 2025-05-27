@@ -1,7 +1,7 @@
 import unittest
 import torch
 
-from simulation.LM import LinearModel
+from simulation.lm import LinearModel
 
 
 dtype = torch.float64

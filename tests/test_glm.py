@@ -1,8 +1,8 @@
 import unittest
 import torch
 
-from simulation.GLM import GeneralizedLinearModel
-from simulation.LM import LinearModel
+from simulation.glm import GeneralizedLinearModel
+from simulation.lm import LinearModel
 from family import FamilyEnum
 
 

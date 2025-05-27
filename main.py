@@ -6,8 +6,8 @@ import csv
 import torch
 from torch.types import Tensor
 
-from simulation.LM import LM
-from simulation.GLM import GLM
+from simulation.lm import LM
+from simulation.glm import GLM
 from simulation.dataclasses import ModelCoefficients
 from simulation.aggregator import aggregator
 
