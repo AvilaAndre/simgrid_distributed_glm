@@ -151,8 +151,6 @@ class GLM:
 
                     self.broadcast_nodes()
 
-                self.send_coefficients_and_exit()
-
     def send_coefficients_and_exit(self):
         self.aggregator_mb.put(
             ModelCoefficients(self.state.model.coefficients), 0
