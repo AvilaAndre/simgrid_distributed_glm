@@ -40,3 +40,11 @@ class LinearModel:
     def update_distributed_n(cls, r_local, r_remote) -> tuple[Tensor, Tensor]:
         return cls.ols_n(torch.cat([r_local, r_remote], dim=0))
 
+    @classmethod
+    def update(cls: type[T], r_local: Tensor, x: Tensor, y: Tensor) -> T:
+        r_local, beta = LinearModel.update_n(r_local, x, y)
+        return cls(r_local, beta)
+
+    @classmethod
+    def update_n(cls, r_local: Tensor, x: Tensor, y: Tensor) -> tuple[Tensor, Tensor]:
+        return cls.ols_n(torch.cat([r_local, torch.cat([x, y], dim=1)]))
