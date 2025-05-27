@@ -54,7 +54,7 @@ class GLM:
                 this_actor.warning("NOT YET IMPLEMENTED")
             else:
                 this_actor.warning(
-                    f"Actor {self.name} received invalid message of type {type(msg_received)}"
+                    f"Received invalid message of type {type(msg_received)}"
                 )
 
     def broadcast_sum_rows(self):
