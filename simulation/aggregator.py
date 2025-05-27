@@ -23,12 +23,20 @@ def aggregator(name: str, n: int, central_lm: ModelCoefficients):
 
     check(central_lm, coefficient_msgs)
 
-    Actor.kill_all()
+    this_actor.exit()
 
 
 def check(central: ModelCoefficients, coefficients_msgs: list[ModelCoefficients]):
     res = all(
         np.allclose(msg.coefficients, central.coefficients) for msg in coefficients_msgs
     )
+
+    print("msgs", len(coefficients_msgs))
+
+    vals = [msg.coefficients for msg in coefficients_msgs]
+
+    for v in vals:
+        print(v)
+    print("central", central.coefficients)
 
     this_actor.info(f"Are the coefficients from every peer equal to central's? {res}")

@@ -1,9 +1,15 @@
 from simgrid import Engine, Mailbox, this_actor
 import torch
+from torch.types import Tensor
 
 from family import FamilyEnum
 from generalized_linear_model import GeneralizedLinearModel
-from .dataclasses import GLMState, GLMSumRowsMessage, GLMConcatMessage
+from .dataclasses import (
+    GLMState,
+    GLMSumRowsMessage,
+    GLMConcatMessage,
+    ModelCoefficients,
+)
 
 
 class GLM:
@@ -14,9 +20,7 @@ class GLM:
         GLM._next_id += 1
         return name
 
-    def __init__(
-        self, name: str, aggregator_name: str, x: torch.Tensor, y: torch.Tensor
-    ):
+    def __init__(self, name: str, aggregator_name: str, x: Tensor, y: Tensor):
         this_actor.on_exit(
             lambda killed: this_actor.info(
                 "Exiting now (killed)." if killed else "Exiting now (finishing)."
@@ -49,9 +53,8 @@ class GLM:
             if isinstance(msg_received, GLMSumRowsMessage):
                 self.receive_sum_rows_msg(msg_received)
             elif isinstance(msg_received, GLMConcatMessage):
-                # self.receive_concat_r_msg(msg_received)
-                # TODO: this
-                this_actor.warning("NOT YET IMPLEMENTED")
+                if not self.state.finished:
+                    self.receive_concat_r_msg(msg_received)
             else:
                 this_actor.warning(
                     f"Received invalid message of type {type(msg_received)}"
@@ -96,3 +99,66 @@ class GLM:
                 self.state.total_nrow += sum(self.state.r_remotes.values())
                 self.broadcast_nodes()
                 self.state.r_remotes = {}
+
+    def receive_concat_r_msg(self, msg: GLMConcatMessage):
+        sender, r_remote, iter = msg.origin, msg.r_remote, msg.iter
+
+        if iter not in self.state.r_remotes.keys():
+            self.state.r_remotes[iter] = {}
+
+        self.handle_iter(sender, r_remote, iter)
+
+    def handle_iter(self, sender: str, r_remote: Tensor, iter: int):
+        if iter not in self.state.r_remotes or sender in self.state.r_remotes[iter]:
+            return
+        else:
+            self.state.r_remotes[iter][sender] = r_remote
+
+            if iter == self.state.model.iter and len(self.state.nodes) == len(
+                self.state.r_remotes[iter].keys()
+            ):
+                r_local_with_all_r_remotes = torch.cat(
+                    [self.state.model.r_local]
+                    + list(self.state.r_remotes[iter].values())
+                )
+
+                r_local, beta, stop = (
+                    GeneralizedLinearModel.distributed_binomial_single_solve_n(
+                        r_local_with_all_r_remotes,
+                        self.state.model.coefficients,
+                        self.state.total_nrow,
+                        GeneralizedLinearModel.default_maxit,
+                        GeneralizedLinearModel.default_tol,
+                        self.state.model.iter,
+                    )
+                )
+
+                self.state.model.r_local = r_local
+                self.state.model.coefficients = beta
+                self.state.model.iter += 1
+
+                self.state.finished = stop
+
+                if self.state.finished:
+                    self.send_coefficients_and_exit()
+                    return
+                else:
+                    self.state.model.r_local = (
+                        GeneralizedLinearModel.distributed_binomial_single_iter_n(
+                            self.state.data[0],
+                            self.state.data[1],
+                            beta,
+                        )
+                    )
+
+                    self.broadcast_nodes()
+
+                self.send_coefficients_and_exit()
+
+    def send_coefficients_and_exit(self):
+        self.aggregator_mb.put(
+            ModelCoefficients(self.state.model.coefficients), 0
+        )  # TODO: Add message size
+
+        # kill actor
+        this_actor.exit()

@@ -8,6 +8,9 @@ T = TypeVar("T", bound="GeneralizedLinearModel")
 
 
 class GeneralizedLinearModel:
+    default_maxit = 25
+    default_tol = 1.0e-10
+
     def __init__(
         self,
         r_local: Tensor,
@@ -23,8 +26,8 @@ class GeneralizedLinearModel:
     @classmethod
     def fit(cls: type[T], x: Tensor, y: Tensor, opts: dict[str, any] = {}) -> T:
         opts.setdefault("family", FamilyEnum.GAUSSIAN)
-        opts.setdefault("maxit", 25)
-        opts.setdefault("tol", 1.0e-10)
+        opts.setdefault("maxit", cls.default_maxit)
+        opts.setdefault("tol", cls.default_tol)
 
         r_local: Tensor
         beta: Tensor
@@ -179,8 +182,28 @@ class GeneralizedLinearModel:
 
         return r_local
 
-    # unimplemented yet!
+    @classmethod
+    def distributed_binomial_single_solve_n(
+        cls,
+        r_local_with_all_r_remotes: Tensor,
+        beta: Tensor,
+        total_nrow: int,
+        maxit: int,
+        tol: float,
+        iter: int,
+    ) -> tuple[Tensor, Tensor, bool]:
+        beta_old = beta
+        r_local, beta = cls.ols_n(r_local_with_all_r_remotes)
+
+        vcov = cls.vcov(r_local, Binomial, total_nrow)
+        delta = (beta_old - beta) / torch.sqrt(torch.diagonal(vcov))
+        diff = torch.abs(delta).max()
+        stop = cls.stop(maxit, tol, iter, diff)
+
+        return (r_local, beta, stop)
+
     # TODO: Remove
+    # unimplemented yet!
 
     @classmethod
     def fit_n(cls, x: Tensor, y: Tensor):
