@@ -4,6 +4,7 @@ import sys
 import os
 import csv
 import torch
+from torch.types import Tensor
 
 from simulation.LM import LM
 from simulation.GLM import GLM
@@ -53,8 +54,8 @@ def start_run(n, data, module):
     assert len(data["x"]) == y_len, "len(x) != len(y)"
     assert n * (ncols + 1) < y_len, "split > ncols"
 
-    data_x = torch.tensor(data["x"], dtype=torch.float64)
-    data_y = torch.tensor(data["y"], dtype=torch.float64)
+    data_x: Tensor = torch.tensor(data["x"], dtype=torch.float64)
+    data_y: Tensor = torch.tensor(data["y"], dtype=torch.float64)
 
     aggregator_name = f"{module.__name__}Aggregator"
 
@@ -79,9 +80,9 @@ def start_run(n, data, module):
     )
 
 
-def chunk_nx(mat, n):
+def chunk_nx(mat: Tensor, n: int) -> list[Tensor]:
     if n == 1:
-        return mat
+        return [mat]
 
     nsplits = mat.shape[0] // n
 
