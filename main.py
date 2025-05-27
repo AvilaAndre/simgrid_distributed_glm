@@ -1,5 +1,4 @@
-from simgrid import Engine, Host, this_actor
-import numpy as np
+from simgrid import Engine, Host
 import argparse
 import sys
 import os

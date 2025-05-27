@@ -1,4 +1,4 @@
-from simgrid import Actor, Mailbox, this_actor
+from simgrid import Mailbox, this_actor
 from .dataclasses import ModelCoefficients
 import numpy as np
 
