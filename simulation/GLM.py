@@ -14,6 +14,7 @@ from .dataclasses import (
 
 class GLM:
     _next_id = 0
+    model_name = "glm"
 
     def next_name() -> str:
         name = f"GeneralizedLinearModel_{GLM._next_id}"

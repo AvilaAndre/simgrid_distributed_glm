@@ -7,6 +7,7 @@ from .dataclasses import LMState, LMConcatMessage, ModelCoefficients
 
 class LM:
     _next_id = 0
+    model_name = "lm"
 
     def next_name() -> str:
         name = f"LinearModel_{LM._next_id}"

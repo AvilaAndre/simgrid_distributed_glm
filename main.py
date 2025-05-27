@@ -12,7 +12,7 @@ from simulation.dataclasses import ModelCoefficients
 from simulation.aggregator import aggregator
 
 
-def model_data(m):
+def model_data(m: str) -> dict[str, list[float]]:
     path = os.path.abspath(f"./{m}_mm.csv")
 
     x_data = []
@@ -32,10 +32,10 @@ def model_data(m):
     return {"x": x_data, "y": y_data}
 
 
-def model_beta(m):
+def model_beta(m: str) -> list[list[float]]:
     path = os.path.abspath(f"./{m}_beta.csv")
 
-    result = []
+    result: list[list[float]] = []
 
     with open(path, newline="") as csvfile:
         reader = csv.reader(csvfile)
@@ -47,7 +47,15 @@ def model_beta(m):
     return result
 
 
-def start_run(n, data, module):
+def model_run(
+    m: LM | GLM,
+    n: int,
+):
+    data: dict[str, list[float]] = model_data(m.model_name)
+    beta = ModelCoefficients(
+        torch.tensor(model_beta(m.model_name), dtype=torch.float64)
+    )
+
     y_len = len(data["y"])
     ncols = len(data["x"][0])
 
@@ -57,16 +65,16 @@ def start_run(n, data, module):
     data_x: Tensor = torch.tensor(data["x"], dtype=torch.float64)
     data_y: Tensor = torch.tensor(data["y"], dtype=torch.float64)
 
-    aggregator_name = f"{module.__name__}Aggregator"
+    aggregator_name = f"{m.__name__}Aggregator"
 
     for x, y in zip(chunk_nx(data_x, n), chunk_nx(data_y, n)):
         # INFO: this is where simulation nodes are started
-        actor_name = module.next_name()
+        actor_name: str = m.next_name()
 
         Engine.instance.add_actor(
             actor_name,
             Host.by_name("Observer"),
-            module,
+            m,
             actor_name,
             aggregator_name,
             x,
@@ -105,14 +113,7 @@ if __name__ == "__main__":
 
     n = 7
 
-    for m in ["lm", "glm"]:
-        data = model_data(m)
-
-        beta = ModelCoefficients(torch.tensor(model_beta(m), dtype=torch.float64))
-
-        if m == "lm":
-            start_run(n, data, LM)
-        elif m == "glm":
-            start_run(n, data, GLM)
+    for m in [LM, GLM]:
+        model_run(m, n)
 
     e.run()
