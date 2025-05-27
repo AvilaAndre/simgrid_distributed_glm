@@ -56,9 +56,7 @@ class LM:
     def receive_concat_r_msg(self, msg: LMConcatMessage):
         sender, r_remote = msg.origin, msg.r_remote
 
-        if sender in self.state.r_remotes.keys():
-            return
-        else:
+        if sender not in self.state.r_remotes.keys():
             self.state.r_remotes[sender] = r_remote
 
             if len(self.state.nodes) == len(self.state.r_remotes.keys()):

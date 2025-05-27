@@ -90,9 +90,7 @@ class GLM:
     def receive_sum_rows_msg(self, msg: GLMSumRowsMessage):
         sender, nrows = msg.origin, msg.nrows
 
-        if sender in self.state.r_remotes.keys():
-            return
-        else:
+        if sender not in self.state.r_remotes.keys():
             self.state.r_remotes[sender] = nrows
 
             if len(self.state.nodes) == len(self.state.r_remotes.keys()):
