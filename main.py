@@ -1,5 +1,6 @@
 from simgrid import Engine, Host, this_actor
 import numpy as np
+import argparse
 import sys
 import os
 import csv
@@ -104,13 +105,53 @@ def chunk_nx(mat: Tensor, n: int) -> list[Tensor]:
     return chunks
 
 
-if __name__ == "__main__":
-    n = 7
+def positive_int(value: str):
+    ivalue = int(value)
+    if ivalue < 1:
+        raise argparse.ArgumentTypeError(f"Invalid value for -n: {value}. Must be ≥ 1.")
+    return ivalue
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Choose the model to run the simulation."
+    )
+
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        choices=["lm", "glm", "both"],
+        default="both",
+        help="Choose from: lm, glm, both (default: both)",
+        required=False,
+    )
+
+    parser.add_argument(
+        "-n",
+        "--n",
+        type=positive_int,
+        default=7,
+        help="The number of actors (default: 7)",
+        required=False,
+    )
+
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
     e = Engine(sys.argv)
     e.load_platform("./obs_platform.xml")
 
-    for m in [LM, GLM]:
-        model_run(m, n)
+    args = parse_args()
+
+    match args.model:
+        case "lm":
+            model_run(LM, args.n)
+        case "glm":
+            model_run(GLM, args.n)
+        case _:
+            for m in [LM, GLM]:
+                model_run(m, args.n)
 
     e.run()
