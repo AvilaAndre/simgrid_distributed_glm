@@ -47,10 +47,7 @@ def model_beta(m: str) -> list[list[float]]:
     return result
 
 
-def model_run(
-    m: LM | GLM,
-    n: int,
-):
+def model_run(m: LM | GLM, n: int):
     data: dict[str, list[float]] = model_data(m.model_name)
     beta = ModelCoefficients(
         torch.tensor(model_beta(m.model_name), dtype=torch.float64)
@@ -108,10 +105,10 @@ def chunk_nx(mat: Tensor, n: int) -> list[Tensor]:
 
 
 if __name__ == "__main__":
+    n = 7
+
     e = Engine(sys.argv)
     e.load_platform("./obs_platform.xml")
-
-    n = 7
 
     for m in [LM, GLM]:
         model_run(m, n)

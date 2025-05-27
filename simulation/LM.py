@@ -29,15 +29,18 @@ class LM:
         self.mailbox = Mailbox.by_name(self.name)
         self.aggregator_mb = Mailbox.by_name(aggregator_name)
 
+        # allow graceful exit
+        self.finished = False
+
         self.run()
 
     def run(self):
-        this_actor.info(f"Actor {self.name} started.")
+        this_actor.info("Started.")
 
         self.broadcast_concat_r()
 
         # Keeps waiting for message until killed
-        while True:
+        while not self.finished:
             self.receive_concat_r_msg(self.mailbox.get())
 
     def broadcast_concat_r(self):
@@ -69,9 +72,6 @@ class LM:
                 self.send_coefficients_and_exit()
 
     def send_coefficients_and_exit(self):
-        self.aggregator_mb.put(
-            ModelCoefficients(self.state.model.coefficients), 0
-        )  # TODO: Add message size
-
-        # kill actor
-        this_actor.exit()
+        # no need for message size as it is a message for the aggregator
+        self.aggregator_mb.put(ModelCoefficients(self.state.model.coefficients), 0)
+        self.finished = True

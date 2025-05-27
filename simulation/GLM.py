@@ -40,15 +40,18 @@ class GLM:
         self.mailbox = Mailbox.by_name(self.name)
         self.aggregator_mb = Mailbox.by_name(aggregator_name)
 
+        # allow graceful exit
+        self.finished = False
+
         self.run()
 
     def run(self):
-        this_actor.info(f"Actor {self.name} started.")
+        this_actor.info("Started.")
 
         self.broadcast_sum_rows()
 
         # Keeps waiting for message until killed
-        while True:
+        while not self.finished:
             msg_received = self.mailbox.get()
 
             if isinstance(msg_received, GLMSumRowsMessage):
@@ -153,9 +156,6 @@ class GLM:
                     self.broadcast_nodes()
 
     def send_coefficients_and_exit(self):
-        self.aggregator_mb.put(
-            ModelCoefficients(self.state.model.coefficients), 0
-        )  # TODO: Add message size
-
-        # kill actor
-        this_actor.exit()
+        # no need for message size as it is a message for the aggregator
+        self.aggregator_mb.put(ModelCoefficients(self.state.model.coefficients), 0)
+        self.finished = True

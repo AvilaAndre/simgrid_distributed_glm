@@ -23,8 +23,6 @@ def aggregator(name: str, n: int, central_lm: ModelCoefficients):
 
     check(central_lm, coefficient_msgs)
 
-    this_actor.exit()
-
 
 def check(central: ModelCoefficients, coefficients_msgs: list[ModelCoefficients]):
     res = all(
