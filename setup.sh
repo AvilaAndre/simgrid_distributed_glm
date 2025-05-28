@@ -1,4 +1,4 @@
-# /bin/bash
+#!/bin/bash
 
 echo "This script will setup a python virtual environment and install the requirements..."
 echo
