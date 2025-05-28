@@ -47,6 +47,11 @@ def model_beta(m: str) -> list[list[float]]:
     return result
 
 
+def cleanup(m: str):
+    os.remove(f"./{m}_mm.csv")
+    os.remove(f"./{m}_beta.csv")
+
+
 def model_run(m: LM | GLM, n: int):
     data: dict[str, list[float]] = model_data(m.model_name)
     beta = ModelCoefficients(
@@ -152,5 +157,8 @@ if __name__ == "__main__":
         case _:
             for m in [LM, GLM]:
                 model_run(m, args.n)
+
+    for m in [LM, GLM]:
+        cleanup(m.model_name)
 
     e.run()
