@@ -55,7 +55,7 @@ class LM:
 
     def send_concat_r(self, target):
         msg = LMConcatMessage(self.name, self.state.model.r_local)
-        Mailbox.by_name(target).put_async(msg, 0)  # TODO: Add message size
+        Mailbox.by_name(target).put_async(msg, msg.size())
 
     def receive_concat_r_msg(self, msg: LMConcatMessage):
         sender, r_remote = msg.origin, msg.r_remote

@@ -46,9 +46,22 @@ class GLMSumRowsMessage:
     origin: str
     nrows: int
 
+    def size(self) -> int:
+        return (
+            sys.getsizeof(self) + sys.getsizeof(self.origin) + sys.getsizeof(self.nrows)
+        )
+
 
 @dataclass
 class GLMConcatMessage:
     origin: str
     r_remote: Tensor
     iter: int
+
+    def size(self) -> int:
+        return (
+            sys.getsizeof(self)
+            + sys.getsizeof(self.origin)
+            + sys.getsizeof(self.r_remote)
+            + sys.getsizeof(self.iter)
+        )

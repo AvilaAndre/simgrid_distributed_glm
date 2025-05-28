@@ -1,4 +1,4 @@
-from simgrid import Engine, Mailbox, this_actor
+from simgrid import ActivitySet, Engine, Mailbox, this_actor
 import torch
 from torch.types import Tensor
 
@@ -43,6 +43,8 @@ class GLM:
         # allow graceful exit
         self.finished = False
 
+        self.pending_messages = ActivitySet()
+
         self.run()
 
     def run(self):
@@ -85,11 +87,11 @@ class GLM:
         msg = GLMConcatMessage(
             self.name, self.state.model.r_local, self.state.model.iter
         )
-        Mailbox.by_name(target).put_async(msg, 0)  # TODO: Add message size
+        self.pending_messages.push(Mailbox.by_name(target).put_async(msg, msg.size()))
 
     def send_sum_rows(self, target):
         msg = GLMSumRowsMessage(self.name, self.state.total_nrow)
-        Mailbox.by_name(target).put_async(msg, 0)  # TODO: Add message size
+        self.pending_messages.push(Mailbox.by_name(target).put_async(msg, msg.size()))
 
     def receive_sum_rows_msg(self, msg: GLMSumRowsMessage):
         sender, nrows = msg.origin, msg.nrows
