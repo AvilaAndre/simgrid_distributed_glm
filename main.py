@@ -1,4 +1,4 @@
-from simgrid import Engine, Host
+from simgrid import Engine
 import argparse
 import sys
 import os
@@ -10,6 +10,7 @@ from simulation.lm import LM
 from simulation.glm import GLM
 from simulation.dataclasses import ModelCoefficients
 from simulation.aggregator import aggregator
+from simulation.topologies import star
 
 
 def model_data(m: str) -> dict[str, list[float]]:
@@ -69,13 +70,26 @@ def model_run(m: LM | GLM, n: int):
 
     aggregator_name = f"{m.__name__}Aggregator"
 
+    zone = e.netzone_root.add_netzone_full(f"{m.__name__}NetZone")
+
+    aggregator_host = zone.add_host(f"AggregatorHost{m.__name__}", 25e6)
+    model_hosts = []
+
     for x, y in zip(chunk_nx(data_x, n), chunk_nx(data_y, n)):
         # INFO: this is where simulation nodes are started
         actor_name: str = m.next_name()
+        actor_host = zone.add_host(f"Host_{actor_name}", 25e6)
+
+        # add connection to the aggregator
+        agg_link = zone.add_split_duplex_link(f"link_{actor_name}_aggregator", 1e6)
+        agg_link.set_latency(0).seal()
+
+        zone.add_route(actor_host, aggregator_host, [agg_link])
+        model_hosts.append(actor_host)
 
         Engine.instance.add_actor(
             actor_name,
-            Host.by_name("Observer"),
+            actor_host,
             m,
             actor_name,
             aggregator_name,
@@ -83,11 +97,13 @@ def model_run(m: LM | GLM, n: int):
             y,
         )
 
+    # apply star topology
+    star(zone, model_hosts, m.model_name)
+    zone.seal()
+
     # TODO: Add actors names which should be
     # sending message to know when to stop.
-    e.add_actor(
-        aggregator_name, Host.by_name("Observer"), aggregator, aggregator_name, n, beta
-    )
+    e.add_actor(aggregator_name, aggregator_host, aggregator, aggregator_name, n, beta)
 
 
 def chunk_nx(mat: Tensor, n: int) -> list[Tensor]:
@@ -145,8 +161,6 @@ def parse_args():
 
 if __name__ == "__main__":
     e = Engine(sys.argv)
-    e.load_platform("./obs_platform.xml")
-
     args = parse_args()
 
     match args.model:
