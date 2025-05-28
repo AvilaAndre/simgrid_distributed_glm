@@ -202,20 +202,3 @@ class GeneralizedLinearModel:
 
         return (r_local, beta, stop)
 
-    # TODO: Remove
-    # unimplemented yet!
-
-    @classmethod
-    def fit_n(cls, x: Tensor, y: Tensor):
-        r_xy_or_xy: Tensor = torch.cat([x, y], dim=1)
-        return cls.ols_n(r_xy_or_xy)
-
-    @classmethod
-    @classmethod
-    def update_distributed(cls: type[T], lm: T, r_remote: Tensor) -> T:
-        r_local, beta = cls.update_distributed_n(lm.r_local, r_remote)
-        return GeneralizedLinearModel(r_local, beta)
-
-    @classmethod
-    def update_distributed_n(cls, r_local, r_remote) -> tuple[Tensor, Tensor]:
-        return cls.ols_n(torch.cat([r_local, r_remote], dim=0))
